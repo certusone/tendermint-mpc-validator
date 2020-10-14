@@ -13,8 +13,9 @@ import (
 	"github.com/tendermint/tendermint/types"
 )
 
-// NodeClient dials a node responds to signature requests using its privVal.
-type NodeClient struct {
+// ReconnRemoteSigner dials using its dialer and responds to any
+// signature requests using its privVal.
+type ReconnRemoteSigner struct {
 	cmn.BaseService
 
 	address string
@@ -25,19 +26,19 @@ type NodeClient struct {
 	dialer net.Dialer
 }
 
-// NewNodeClient return a NodeClient that will dial using the given
+// NewReconnRemoteSigner return a ReconnRemoteSigner that will dial using the given
 // dialer and respond to any signature requests over the connection
 // using the given privVal.
 //
-// If the connection is broken, the NodeClient will attempt to reconnect.
-func NewNodeClient(
+// If the connection is broken, the ReconnRemoteSigner will attempt to reconnect.
+func NewReconnRemoteSigner(
 	address string,
 	logger log.Logger,
 	chainID string,
 	privVal types.PrivValidator,
 	dialer net.Dialer,
-) *NodeClient {
-	rs := &NodeClient{
+) *ReconnRemoteSigner {
+	rs := &ReconnRemoteSigner{
 		address: address,
 		chainID: chainID,
 		privVal: privVal,
@@ -50,13 +51,13 @@ func NewNodeClient(
 }
 
 // OnStart implements cmn.Service.
-func (rs *NodeClient) OnStart() error {
+func (rs *ReconnRemoteSigner) OnStart() error {
 	go rs.loop()
 	return nil
 }
 
-// main loop for NodeClient
-func (rs *NodeClient) loop() {
+// main loop for ReconnRemoteSigner
+func (rs *ReconnRemoteSigner) loop() {
 	var conn net.Conn
 	for {
 		if !rs.IsRunning() {
@@ -120,7 +121,7 @@ func (rs *NodeClient) loop() {
 	}
 }
 
-func (rs *NodeClient) handleRequest(req privval.RemoteSignerMsg) (privval.RemoteSignerMsg, error) {
+func (rs *ReconnRemoteSigner) handleRequest(req privval.RemoteSignerMsg) (privval.RemoteSignerMsg, error) {
 	var res privval.RemoteSignerMsg
 	var err error
 

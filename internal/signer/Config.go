@@ -16,6 +16,7 @@ type CosignerConfig struct {
 }
 
 type Config struct {
+	Mode              string           `toml:"mode"`
 	PrivValKeyFile    string           `toml:"key_file"`
 	PrivValStateDir   string           `toml:"state_dir"`
 	ChainID           string           `toml:"chain_id"`
@@ -27,6 +28,9 @@ type Config struct {
 
 func LoadConfigFromFile(file string) (Config, error) {
 	var config Config
+
+	// default mode is mpc
+	config.Mode = "mpc"
 
 	reader, err := os.Open(file)
 	if err != nil {
