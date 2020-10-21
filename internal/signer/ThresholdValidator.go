@@ -167,10 +167,10 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 	// block on the signing request completing.
 	// The inner routine (formed within each request goroutine), dispatches the actual signing call.
 	// This is to support a time out which can happen when using remote signers.
-	for _, cosigner := range pv.peers {
-		request := func(cosigner Cosigner) {
-			cosignerId := cosigner.GetID()
-			cosignerIdx := cosignerId - 1
+	for _, peer := range pv.peers {
+		request := func(peer Cosigner) {
+			peerId := peer.GetID()
+			peerIdx := peerId - 1
 
 			// cosigner.Sign makes a blocking RPC request (with no timeout)
 			// to prevent it from hanging our process indefinitely, we use a timeout context
@@ -179,7 +179,7 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 
 			go func() {
 				hasResp, err := pv.cosigner.HasEphemeralSecretPart(CosignerHasEphemeralSecretPartRequest{
-					ID:     cosignerId,
+					ID:     peerId,
 					Height: height,
 					Round:  round,
 					Step:   step,
@@ -200,7 +200,7 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 
 				if !hasResp.Exists {
 					// if we don't already have an ephemeral secret part for the HRS, we need to get one
-					ephSecretResp, err := cosigner.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
+					ephSecretResp, err := peer.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{
 						ID:     ourID,
 						Height: height,
 						Round:  round,
@@ -225,6 +225,7 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 
 					// set the response for ourselves
 					err = pv.cosigner.SetEphemeralSecretPart(CosignerSetEphemeralSecretPartRequest{
+						SourceSig:                      ephSecretResp.SourceSig,
 						SourceID:                       ephSecretResp.SourceID,
 						SourceEphemeralSecretPublicKey: ephSecretResp.SourceEphemeralSecretPublicKey,
 						EncryptedSharePart:             ephSecretResp.EncryptedSharePart,
@@ -251,7 +252,7 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 				}
 
 				// ask the cosigner to sign with their share
-				sigResp, err := cosigner.Sign(CosignerSignRequest{
+				sigResp, err := peer.Sign(CosignerSignRequest{
 					SignBytes: signBytes,
 				})
 
@@ -283,8 +284,8 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 				shareSignaturesMutex.Lock()
 				defer shareSignaturesMutex.Unlock()
 
-				shareSignatures[cosignerIdx] = make([]byte, len(sigResp.Signature))
-				copy(shareSignatures[cosignerIdx], sigResp.Signature)
+				shareSignatures[peerIdx] = make([]byte, len(sigResp.Signature))
+				copy(shareSignatures[peerIdx], sigResp.Signature)
 			}()
 
 			// the sign context finished or timed out
@@ -295,7 +296,7 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 			wg.Done()
 		}
 
-		go request(cosigner)
+		go request(peer)
 	}
 
 	// Wait for all cosigners to be complete
