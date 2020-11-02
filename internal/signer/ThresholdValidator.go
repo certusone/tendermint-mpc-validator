@@ -58,8 +58,8 @@ func NewThresholdValidator(opt *ThresholdValidatorOpt) *ThresholdValidator {
 
 // GetPubKey returns the public key of the validator.
 // Implements PrivValidator.
-func (pv *ThresholdValidator) GetPubKey() crypto.PubKey {
-	return pv.pubkey
+func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
+	return pv.pubkey, nil
 }
 
 // SignVote signs a canonical representation of the vote, along with the

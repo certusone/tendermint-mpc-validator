@@ -15,7 +15,7 @@ type PvGuard struct {
 }
 
 // GetPubKey implementes types.PrivValidator
-func (pv *PvGuard) GetPubKey() crypto.PubKey {
+func (pv *PvGuard) GetPubKey() (crypto.PubKey, error) {
 	pv.pvMutex.Lock()
 	defer pv.pvMutex.Unlock()
 	return pv.PrivValidator.GetPubKey()

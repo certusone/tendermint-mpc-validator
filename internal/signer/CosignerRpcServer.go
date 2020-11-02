@@ -7,10 +7,11 @@ import (
 	"sync"
 	"time"
 
-	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/libs/log"
-	server "github.com/tendermint/tendermint/rpc/lib/server"
-	rpc_types "github.com/tendermint/tendermint/rpc/lib/types"
+	tmnet "github.com/tendermint/tendermint/libs/net"
+	"github.com/tendermint/tendermint/libs/service"
+	server "github.com/tendermint/tendermint/rpc/jsonrpc/server"
+	rpc_types "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 )
 
 type RpcSignRequest struct {
@@ -45,7 +46,7 @@ type CosignerRpcServerConfig struct {
 
 // CosignerRpcServer responds to rpc sign requests using a cosigner instance
 type CosignerRpcServer struct {
-	cmn.BaseService
+	service.BaseService
 
 	logger        log.Logger
 	listenAddress string
@@ -63,13 +64,13 @@ func NewCosignerRpcServer(config *CosignerRpcServerConfig) *CosignerRpcServer {
 		logger:        config.Logger,
 	}
 
-	cosignerRpcServer.BaseService = *cmn.NewBaseService(config.Logger, "CosignerRpcServer", cosignerRpcServer)
+	cosignerRpcServer.BaseService = *service.NewBaseService(config.Logger, "CosignerRpcServer", cosignerRpcServer)
 	return cosignerRpcServer
 }
 
 // OnStart starts the rpm server to respond to remote CosignerSignRequests
 func (rpcServer *CosignerRpcServer) OnStart() error {
-	proto, address := cmn.ProtocolAndAddress(rpcServer.listenAddress)
+	proto, address := tmnet.ProtocolAndAddress(rpcServer.listenAddress)
 
 	lis, err := net.Listen(proto, address)
 	if err != nil {
@@ -91,7 +92,7 @@ func (rpcServer *CosignerRpcServer) OnStart() error {
 
 	go func() {
 		defer lis.Close()
-		server.StartHTTPServer(lis, mux, tcpLogger, config)
+		server.Serve(lis, mux, tcpLogger, config)
 	}()
 
 	return nil

@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"tendermint-signer/internal/signer"
-
-	cmn "github.com/tendermint/tendermint/libs/common"
 	tmlog "github.com/tendermint/tendermint/libs/log"
+	tmOS "github.com/tendermint/tendermint/libs/os"
+	tmService "github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
+	internalSigner "tendermint-signer/internal/signer"
 )
 
 func fileExists(filename string) bool {
@@ -38,7 +38,7 @@ func main() {
 		panic("--config flag is required")
 	}
 
-	config, err := signer.LoadConfigFromFile(*configFile)
+	config, err := internalSigner.LoadConfigFromFile(*configFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,10 +50,10 @@ func main() {
 		"priv-state-dir", config.PrivValStateDir,
 	)
 
-	signer.InitSerialization()
+	internalSigner.InitSerialization()
 
 	// services to stop on shutdown
-	var services []cmn.Service
+	var services []tmService.Service
 
 	var pv types.PrivValidator
 
@@ -73,7 +73,7 @@ func main() {
 			val = privval.LoadFilePVEmptyState(config.PrivValKeyFile, stateFile)
 		}
 
-		pv = &signer.PvGuard{PrivValidator: val}
+		pv = &internalSigner.PvGuard{PrivValidator: val}
 	} else if config.Mode == "mpc" {
 		if config.CosignerThreshold == 0 {
 			log.Fatal("The `cosigner_threshold` option is required in `threshold` mode")
@@ -83,7 +83,7 @@ func main() {
 			log.Fatal("The cosigner_listen_address option is required in `threshold` mode")
 		}
 
-		key, err := signer.LoadCosignerKey(config.PrivValKeyFile)
+		key, err := internalSigner.LoadCosignerKey(config.PrivValKeyFile)
 		if err != nil {
 			panic(err)
 		}
@@ -91,7 +91,7 @@ func main() {
 		// ok to auto initialize on disk since the cosigner share is the one that actually
 		// protects against double sign - this exists as a cache for the final signature
 		stateFile := path.Join(config.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
-		signState, err := signer.LoadOrCreateSignState(stateFile)
+		signState, err := internalSigner.LoadOrCreateSignState(stateFile)
 		if err != nil {
 			panic(err)
 		}
@@ -99,22 +99,22 @@ func main() {
 		// state for our cosigner share
 		// Not automatically initialized on disk to avoid double sign risk
 		shareStateFile := path.Join(config.PrivValStateDir, fmt.Sprintf("%s_share_sign_state.json", chainID))
-		shareSignState, err := signer.LoadSignState(shareStateFile)
+		shareSignState, err := internalSigner.LoadSignState(shareStateFile)
 		if err != nil {
 			panic(err)
 		}
 
-		cosigners := []signer.Cosigner{}
-		remoteCosigners := []signer.RemoteCosigner{}
+		cosigners := []internalSigner.Cosigner{}
+		remoteCosigners := []internalSigner.RemoteCosigner{}
 
 		// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
-		peers := []signer.CosignerPeer{signer.CosignerPeer{
+		peers := []internalSigner.CosignerPeer{internalSigner.CosignerPeer{
 			ID:        key.ID,
 			PublicKey: key.RSAKey.PublicKey,
 		}}
 
 		for _, cosignerConfig := range config.Cosigners {
-			cosigner := signer.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
+			cosigner := internalSigner.NewRemoteCosigner(cosignerConfig.ID, cosignerConfig.Address)
 			cosigners = append(cosigners, cosigner)
 			remoteCosigners = append(remoteCosigners, *cosigner)
 
@@ -123,14 +123,14 @@ func main() {
 			}
 
 			pubKey := key.CosignerKeys[cosignerConfig.ID-1]
-			peers = append(peers, signer.CosignerPeer{
+			peers = append(peers, internalSigner.CosignerPeer{
 				ID:        cosigner.GetID(),
 				PublicKey: *pubKey,
 			})
 		}
 
 		total := len(config.Cosigners) + 1
-		localCosignerConfig := signer.LocalCosignerConfig{
+		localCosignerConfig := internalSigner.LocalCosignerConfig{
 			CosignerKey: key,
 			SignState:   &shareSignState,
 			RsaKey:      key.RSAKey,
@@ -139,9 +139,9 @@ func main() {
 			Threshold:   uint8(config.CosignerThreshold),
 		}
 
-		localCosigner := signer.NewLocalCosigner(localCosignerConfig)
+		localCosigner := internalSigner.NewLocalCosigner(localCosignerConfig)
 
-		val := signer.NewThresholdValidator(&signer.ThresholdValidatorOpt{
+		val := internalSigner.NewThresholdValidator(&internalSigner.ThresholdValidatorOpt{
 			Pubkey:    key.PubKey,
 			Threshold: config.CosignerThreshold,
 			SignState: signState,
@@ -149,25 +149,25 @@ func main() {
 			Peers:     cosigners,
 		})
 
-		rpcServerConfig := signer.CosignerRpcServerConfig{
+		rpcServerConfig := internalSigner.CosignerRpcServerConfig{
 			Logger:        logger,
 			ListenAddress: config.ListenAddress,
 			Cosigner:      localCosigner,
 			Peers:         remoteCosigners,
 		}
 
-		rpcServer := signer.NewCosignerRpcServer(&rpcServerConfig)
+		rpcServer := internalSigner.NewCosignerRpcServer(&rpcServerConfig)
 		rpcServer.Start()
 		services = append(services, rpcServer)
 
-		pv = &signer.PvGuard{PrivValidator: val}
+		pv = &internalSigner.PvGuard{PrivValidator: val}
 	} else {
 		log.Fatalf("Unsupported mode: %s", config.Mode)
 	}
 
 	for _, node := range config.Nodes {
 		dialer := net.Dialer{Timeout: 30 * time.Second}
-		signer := signer.NewReconnRemoteSigner(node.Address, logger, config.ChainID, pv, dialer)
+		signer := internalSigner.NewReconnRemoteSigner(node.Address, logger, config.ChainID, pv, dialer)
 
 		err := signer.Start()
 		if err != nil {
@@ -179,7 +179,7 @@ func main() {
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	cmn.TrapSignal(logger, func() {
+	tmOS.TrapSignal(logger, func() {
 		for _, service := range services {
 			err := service.Stop()
 			if err != nil {

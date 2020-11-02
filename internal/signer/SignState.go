@@ -7,7 +7,8 @@ import (
 	"io/ioutil"
 	"time"
 
-	cmn "github.com/tendermint/tendermint/libs/common"
+	tmBytes "github.com/tendermint/tendermint/libs/bytes"
+	"github.com/tendermint/tendermint/libs/tempfile"
 	"github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
@@ -47,12 +48,12 @@ func ProposalToStep(_ *types.Proposal) int8 {
 
 // SignState stores signing information for high level watermark management.
 type SignState struct {
-	Height          int64        `json:"height"`
-	Round           int64        `json:"round"`
-	Step            int8         `json:"step"`
-	EphemeralPublic []byte       `json:"ephemeral_public"`
-	Signature       []byte       `json:"signature,omitempty"`
-	SignBytes       cmn.HexBytes `json:"signbytes,omitempty"`
+	Height          int64            `json:"height"`
+	Round           int64            `json:"round"`
+	Step            int8             `json:"step"`
+	EphemeralPublic []byte           `json:"ephemeral_public"`
+	Signature       []byte           `json:"signature,omitempty"`
+	SignBytes       tmBytes.HexBytes `json:"signbytes,omitempty"`
 
 	filePath string
 }
@@ -67,7 +68,7 @@ func (signState *SignState) Save() {
 	if err != nil {
 		panic(err)
 	}
-	err = cmn.WriteFileAtomic(outFile, jsonBytes, 0600)
+	err = tempfile.WriteFileAtomic(outFile, jsonBytes, 0600)
 	if err != nil {
 		panic(err)
 	}
