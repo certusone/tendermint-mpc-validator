@@ -14,7 +14,7 @@ import (
 	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
-	cmn "github.com/tendermint/tendermint/libs/common"
+	tmOS "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/privval"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
@@ -34,12 +34,12 @@ func main() {
 	keyFilePath := flag.Args()[0]
 	keyJSONBytes, err := ioutil.ReadFile(keyFilePath)
 	if err != nil {
-		cmn.Exit(err.Error())
+		tmOS.Exit(err.Error())
 	}
 	pvKey := privval.FilePVKey{}
 	err = cdc.UnmarshalJSON(keyJSONBytes, &pvKey)
 	if err != nil {
-		cmn.Exit(fmt.Sprintf("Error reading PrivValidator key from %v: %v\n", keyFilePath, err))
+		tmOS.Exit(fmt.Sprintf("Error reading PrivValidator key from %v: %v\n", keyFilePath, err))
 	}
 
 	privKeyBytes := [64]byte{}

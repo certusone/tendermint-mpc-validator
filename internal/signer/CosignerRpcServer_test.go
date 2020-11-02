@@ -65,7 +65,7 @@ func TestCosignerRpcServerSign(test *testing.T) {
 	signBytes, err := cdc.MarshalBinaryLengthPrefixed(vote)
 	require.NoError(test, err)
 
-	remoteCosigner := NewRemoteCosigner(2, rpcServer.Addr().String())
+	remoteCosigner := NewRemoteCosigner(2, rpcServer.listener.Addr().Network()+"://"+rpcServer.Addr().String())
 	resp, err := remoteCosigner.Sign(CosignerSignRequest{
 		SignBytes: signBytes,
 	})
@@ -91,7 +91,7 @@ func TestCosignerRpcServerGetEphemeralSecretPart(test *testing.T) {
 	rpcServer := NewCosignerRpcServer(&config)
 	rpcServer.Start()
 
-	remoteCosigner := NewRemoteCosigner(2, rpcServer.Addr().String())
+	remoteCosigner := NewRemoteCosigner(2, rpcServer.listener.Addr().Network()+"://"+rpcServer.Addr().String())
 
 	resp, err := remoteCosigner.GetEphemeralSecretPart(CosignerGetEphemeralSecretPartRequest{})
 	require.NoError(test, err)

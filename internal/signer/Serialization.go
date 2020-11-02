@@ -19,7 +19,7 @@ func InitSerialization() {
 }
 
 // ReadMsg reads a message from an io.Reader
-func ReadMsg(reader io.Reader) (msg privval.RemoteSignerMsg, err error) {
+func ReadMsg(reader io.Reader) (msg privval.SignerMessage, err error) {
 	const maxRemoteSignerMsgSize = 1024 * 10
 	_, err = codec.UnmarshalBinaryLengthPrefixedReader(reader, &msg, maxRemoteSignerMsgSize)
 	return

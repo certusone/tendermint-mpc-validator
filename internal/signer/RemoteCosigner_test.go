@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/libs/log"
-	server "github.com/tendermint/tendermint/rpc/lib/server"
-	rpc_types "github.com/tendermint/tendermint/rpc/lib/types"
+	server "github.com/tendermint/tendermint/rpc/jsonrpc/server"
+	rpc_types "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 )
 
 func rpcSignRequest(ctx *rpc_types.Context, req RpcSignRequest) (*RpcSignResponse, error) {
@@ -43,7 +43,7 @@ func TestRemoteCosignerSign(test *testing.T) {
 
 		tcpLogger := logger.With("socket", "tcp")
 		config := server.DefaultConfig()
-		server.StartHTTPServer(lis, mux, tcpLogger, config)
+		server.Serve(lis, mux, tcpLogger, config)
 	}
 	go serv()
 
@@ -72,7 +72,7 @@ func TestRemoteCosignerGetEphemeralSecretPart(test *testing.T) {
 
 		tcpLogger := logger.With("socket", "tcp")
 		config := server.DefaultConfig()
-		server.StartHTTPServer(lis, mux, tcpLogger, config)
+		server.Serve(lis, mux, tcpLogger, config)
 	}
 	go serv()
 

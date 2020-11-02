@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/tendermint/tendermint/crypto/ed25519"
-	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/libs/log"
+	tmnet "github.com/tendermint/tendermint/libs/net"
+	"github.com/tendermint/tendermint/libs/service"
 	p2pconn "github.com/tendermint/tendermint/p2p/conn"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
@@ -16,7 +17,7 @@ import (
 // ReconnRemoteSigner dials using its dialer and responds to any
 // signature requests using its privVal.
 type ReconnRemoteSigner struct {
-	cmn.BaseService
+	service.BaseService
 
 	address string
 	chainID string
@@ -46,7 +47,7 @@ func NewReconnRemoteSigner(
 		privKey: ed25519.GenPrivKey(),
 	}
 
-	rs.BaseService = *cmn.NewBaseService(logger, "RemoteSigner", rs)
+	rs.BaseService = *service.NewBaseService(logger, "RemoteSigner", rs)
 	return rs
 }
 
@@ -63,14 +64,14 @@ func (rs *ReconnRemoteSigner) loop() {
 		if !rs.IsRunning() {
 			if conn != nil {
 				if err := conn.Close(); err != nil {
-					rs.Logger.Error("Close", "err", cmn.ErrorWrap(err, "closing listener failed"))
+					rs.Logger.Error("Close", "err", err.Error()+"closing listener failed")
 				}
 			}
 			return
 		}
 
 		for conn == nil {
-			proto, address := cmn.ProtocolAndAddress(rs.address)
+			proto, address := tmnet.ProtocolAndAddress(rs.address)
 			netConn, err := rs.dialer.Dial(proto, address)
 			if err != nil {
 				rs.Logger.Error("Dialing", "err", err)
@@ -93,7 +94,7 @@ func (rs *ReconnRemoteSigner) loop() {
 		// since dialing can take time, we check running again
 		if !rs.IsRunning() {
 			if err := conn.Close(); err != nil {
-				rs.Logger.Error("Close", "err", cmn.ErrorWrap(err, "closing listener failed"))
+				rs.Logger.Error("Close", "err", err.Error()+"closing listener failed")
 			}
 			return
 		}
@@ -121,14 +122,25 @@ func (rs *ReconnRemoteSigner) loop() {
 	}
 }
 
-func (rs *ReconnRemoteSigner) handleRequest(req privval.RemoteSignerMsg) (privval.RemoteSignerMsg, error) {
-	var res privval.RemoteSignerMsg
+func (rs *ReconnRemoteSigner) handleRequest(req privval.SignerMessage) (privval.SignerMessage, error) {
+	var res privval.SignerMessage
 	var err error
 
 	switch typedReq := req.(type) {
 	case *privval.PubKeyRequest:
-		pubKey := rs.privVal.GetPubKey()
-		res = &privval.PubKeyResponse{PubKey: pubKey, Error: nil}
+		pubKey, err := rs.privVal.GetPubKey()
+		if err != nil {
+			rs.Logger.Error("Failed to get Pub Key", "address", rs.address, "error", err, "pubKey", typedReq)
+			res = &privval.PubKeyResponse{
+				PubKey: nil,
+				Error: &privval.RemoteSignerError{
+					Code:        0,
+					Description: err.Error(),
+				},
+			}
+		} else {
+			res = &privval.PubKeyResponse{PubKey: pubKey, Error: nil}
+		}
 	case *privval.SignVoteRequest:
 		err = rs.privVal.SignVote(rs.chainID, typedReq.Vote)
 		if err != nil {
