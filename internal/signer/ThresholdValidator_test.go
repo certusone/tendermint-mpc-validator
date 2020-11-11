@@ -8,8 +8,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	tm_ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	"github.com/tendermint/tendermint/types"
+	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
 
@@ -33,7 +34,7 @@ func TestThresholdValidator2of2(test *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := tm_ed25519.GenPrivKey()
+	privateKey := tmCryptoEd25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
 	copy(privKeyBytes[:], privateKey[:])
@@ -103,12 +104,12 @@ func TestThresholdValidator2of2(test *testing.T) {
 
 	validator := NewThresholdValidator(&thresholdValidatorOpt)
 
-	var proposal types.Proposal
+	var proposal tmProto.Proposal
 	proposal.Height = 1
 	proposal.Round = 0
-	proposal.Type = types.ProposalType
+	proposal.Type = tmProto.ProposalType
 
-	signBytes := proposal.SignBytes("chain-id")
+	signBytes := tm.ProposalSignBytes("chain-id", &proposal)
 
 	// To perform a sign operation, cosigner 2 will need its ephemeral nonce part from cosigner 1.
 	// During normal operation, cosigner 2 would use an rpc call to cosigner 1 to request its part.
@@ -139,6 +140,6 @@ func TestThresholdValidator2of2(test *testing.T) {
 	err = validator.SignProposal("chain-id", &proposal)
 	require.NoError(test, err)
 
-	require.True(test, privateKey.PubKey().VerifyBytes(signBytes, proposal.Signature))
+	require.True(test, privateKey.PubKey().VerifySignature(signBytes, proposal.Signature))
 
 }

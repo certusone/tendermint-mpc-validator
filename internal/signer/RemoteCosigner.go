@@ -1,9 +1,14 @@
 package signer
 
 import (
+	"context"
 	"errors"
 
 	client "github.com/tendermint/tendermint/rpc/jsonrpc/client"
+)
+
+var (
+	ctx = context.Background()
 )
 
 // RemoteCosigner uses tendermint rpc to request signing from a remote cosigner
@@ -41,7 +46,7 @@ func (cosigner *RemoteCosigner) Sign(signReq CosignerSignRequest) (CosignerSignR
 		return CosignerSignResponse{}, err
 	}
 	result := &CosignerSignResponse{}
-	_, err = remoteClient.Call("Sign", params, result)
+	_, err = remoteClient.Call(ctx, "Sign", params, result)
 	if err != nil {
 		return CosignerSignResponse{}, err
 	}
@@ -69,7 +74,7 @@ func (cosigner *RemoteCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralS
 		return CosignerGetEphemeralSecretPartResponse{}, err
 	}
 	result := &RpcGetEphemeralSecretPartResponse{}
-	_, err = remoteClient.Call("GetEphemeralSecretPart", params, result)
+	_, err = remoteClient.Call(ctx, "GetEphemeralSecretPart", params, result)
 	if err != nil {
 		return CosignerGetEphemeralSecretPartResponse{}, err
 	}

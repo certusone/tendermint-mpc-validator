@@ -84,7 +84,7 @@ func (rpcServer *CosignerRpcServer) OnStart() error {
 	}
 
 	mux := http.NewServeMux()
-	server.RegisterRPCFuncs(mux, routes, cdc, log.NewFilter(rpcServer.Logger, log.AllowError()))
+	server.RegisterRPCFuncs(mux, routes, log.NewFilter(rpcServer.Logger, log.AllowError()))
 
 	tcpLogger := rpcServer.Logger.With("socket", "tcp")
 	tcpLogger = log.NewFilter(tcpLogger, log.AllowError())

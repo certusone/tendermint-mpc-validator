@@ -39,7 +39,7 @@ func TestRemoteCosignerSign(test *testing.T) {
 		}
 
 		mux := http.NewServeMux()
-		server.RegisterRPCFuncs(mux, routes, cdc, logger)
+		server.RegisterRPCFuncs(mux, routes, logger)
 
 		tcpLogger := logger.With("socket", "tcp")
 		config := server.DefaultConfig()
@@ -68,7 +68,7 @@ func TestRemoteCosignerGetEphemeralSecretPart(test *testing.T) {
 		}
 
 		mux := http.NewServeMux()
-		server.RegisterRPCFuncs(mux, routes, cdc, logger)
+		server.RegisterRPCFuncs(mux, routes, logger)
 
 		tcpLogger := logger.With("socket", "tcp")
 		config := server.DefaultConfig()

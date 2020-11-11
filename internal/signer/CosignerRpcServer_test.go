@@ -6,7 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/libs/log"
-	"github.com/tendermint/tendermint/types"
+	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tm "github.com/tendermint/tendermint/types"
 )
 
 type DummyCosigner struct{}
@@ -56,14 +57,11 @@ func TestCosignerRpcServerSign(test *testing.T) {
 	rpcServer.Start()
 
 	// pack a vote into sign bytes
-	var vote types.CanonicalVote
-	vote.ChainID = "foobar"
+	var vote tmProto.Vote
 	vote.Height = 1
 	vote.Round = 0
-	vote.Type = types.PrevoteType
-
-	signBytes, err := cdc.MarshalBinaryLengthPrefixed(vote)
-	require.NoError(test, err)
+	vote.Type = tmProto.PrevoteType
+	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
 	remoteCosigner := NewRemoteCosigner(2, rpcServer.listener.Addr().Network()+"://"+rpcServer.Addr().String())
 	resp, err := remoteCosigner.Sign(CosignerSignRequest{

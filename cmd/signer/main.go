@@ -10,12 +10,13 @@ import (
 	"sync"
 	"time"
 
+	internalSigner "tendermint-signer/internal/signer"
+
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmOS "github.com/tendermint/tendermint/libs/os"
 	tmService "github.com/tendermint/tendermint/libs/service"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
-	internalSigner "tendermint-signer/internal/signer"
 )
 
 func fileExists(filename string) bool {
@@ -50,8 +51,6 @@ func main() {
 		"priv-state-dir", config.PrivValStateDir,
 	)
 
-	internalSigner.InitSerialization()
-
 	// services to stop on shutdown
 	var services []tmService.Service
 
@@ -63,18 +62,20 @@ func main() {
 	}
 
 	if config.Mode == "single" {
+		logger.Info("Mode: single")
 		stateFile := path.Join(config.PrivValStateDir, fmt.Sprintf("%s_priv_validator_state.json", chainID))
 
 		var val types.PrivValidator
 		if fileExists(stateFile) {
 			val = privval.LoadFilePV(config.PrivValKeyFile, stateFile)
 		} else {
-			logger.Info("Initializing empty state file")
+			logger.Info("Initializing empty state file", "file", stateFile)
 			val = privval.LoadFilePVEmptyState(config.PrivValKeyFile, stateFile)
 		}
 
 		pv = &internalSigner.PvGuard{PrivValidator: val}
 	} else if config.Mode == "mpc" {
+		logger.Info("Mode: mpc")
 		if config.CosignerThreshold == 0 {
 			log.Fatal("The `cosigner_threshold` option is required in `threshold` mode")
 		}
@@ -108,7 +109,7 @@ func main() {
 		remoteCosigners := []internalSigner.RemoteCosigner{}
 
 		// add ourselves as a peer so localcosigner can handle GetEphSecPart requests
-		peers := []internalSigner.CosignerPeer{internalSigner.CosignerPeer{
+		peers := []internalSigner.CosignerPeer{{
 			ID:        key.ID,
 			PublicKey: key.RSAKey.PublicKey,
 		}}
@@ -164,6 +165,12 @@ func main() {
 	} else {
 		log.Fatalf("Unsupported mode: %s", config.Mode)
 	}
+
+	pubkey, err := pv.GetPubKey()
+	if err != nil {
+		log.Fatal(err)
+	}
+	logger.Info("Signer", "pubkey", pubkey)
 
 	for _, node := range config.Nodes {
 		dialer := net.Dialer{Timeout: 30 * time.Second}

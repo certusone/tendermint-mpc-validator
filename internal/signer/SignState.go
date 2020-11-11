@@ -1,15 +1,17 @@
 package signer
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	tmBytes "github.com/tendermint/tendermint/libs/bytes"
+	tmJson "github.com/tendermint/tendermint/libs/json"
+	"github.com/tendermint/tendermint/libs/protoio"
 	"github.com/tendermint/tendermint/libs/tempfile"
-	"github.com/tendermint/tendermint/types"
+	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
@@ -20,29 +22,29 @@ const (
 	stepPrecommit int8 = 3
 )
 
-func CanonicalVoteToStep(vote *types.CanonicalVote) int8 {
+func CanonicalVoteToStep(vote *tmProto.CanonicalVote) int8 {
 	switch vote.Type {
-	case types.PrevoteType:
+	case tmProto.PrevoteType:
 		return stepPrevote
-	case types.PrecommitType:
+	case tmProto.PrecommitType:
 		return stepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
 }
 
-func VoteToStep(vote *types.Vote) int8 {
+func VoteToStep(vote *tmProto.Vote) int8 {
 	switch vote.Type {
-	case types.PrevoteType:
+	case tmProto.PrevoteType:
 		return stepPrevote
-	case types.PrecommitType:
+	case tmProto.PrecommitType:
 		return stepPrecommit
 	default:
 		panic("Unknown vote type")
 	}
 }
 
-func ProposalToStep(_ *types.Proposal) int8 {
+func ProposalToStep(_ *tmProto.Proposal) int8 {
 	return stepPropose
 }
 
@@ -64,7 +66,7 @@ func (signState *SignState) Save() {
 	if outFile == "" {
 		panic("cannot save SignState: filePath not set")
 	}
-	jsonBytes, err := cdc.MarshalJSONIndent(signState, "", "  ")
+	jsonBytes, err := tmJson.MarshalIndent(signState, "", "  ")
 	if err != nil {
 		panic(err)
 	}
@@ -114,7 +116,8 @@ func LoadSignState(filepath string) (SignState, error) {
 	if err != nil {
 		return state, err
 	}
-	err = cdc.UnmarshalJSON(stateJSONBytes, &state)
+
+	err = tmJson.Unmarshal(stateJSONBytes, &state)
 	if err != nil {
 		return state, err
 	}
@@ -152,11 +155,11 @@ func (signState *SignState) OnlyDifferByTimestamp(signBytes []byte) (time.Time, 
 }
 
 func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.Time, bool) {
-	var lastVote, newVote types.CanonicalVote
-	if err := cdc.UnmarshalBinaryLengthPrefixed(lastSignBytes, &lastVote); err != nil {
+	var lastVote, newVote tmProto.CanonicalVote
+	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastVote); err != nil {
 		panic(fmt.Sprintf("LastSignBytes cannot be unmarshalled into vote: %v", err))
 	}
-	if err := cdc.UnmarshalBinaryLengthPrefixed(newSignBytes, &newVote); err != nil {
+	if err := protoio.UnmarshalDelimited(newSignBytes, &newVote); err != nil {
 		panic(fmt.Sprintf("signBytes cannot be unmarshalled into vote: %v", err))
 	}
 
@@ -166,18 +169,16 @@ func checkVoteOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.Ti
 	now := tmtime.Now()
 	lastVote.Timestamp = now
 	newVote.Timestamp = now
-	lastVoteBytes, _ := cdc.MarshalJSON(lastVote)
-	newVoteBytes, _ := cdc.MarshalJSON(newVote)
 
-	return lastTime, bytes.Equal(newVoteBytes, lastVoteBytes)
+	return lastTime, proto.Equal(&newVote, &lastVote)
 }
 
 func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.Time, bool) {
-	var lastProposal, newProposal types.CanonicalProposal
-	if err := cdc.UnmarshalBinaryLengthPrefixed(lastSignBytes, &lastProposal); err != nil {
+	var lastProposal, newProposal tmProto.CanonicalProposal
+	if err := protoio.UnmarshalDelimited(lastSignBytes, &lastProposal); err != nil {
 		panic(fmt.Sprintf("LastSignBytes cannot be unmarshalled into proposal: %v", err))
 	}
-	if err := cdc.UnmarshalBinaryLengthPrefixed(newSignBytes, &newProposal); err != nil {
+	if err := protoio.UnmarshalDelimited(newSignBytes, &newProposal); err != nil {
 		panic(fmt.Sprintf("signBytes cannot be unmarshalled into proposal: %v", err))
 	}
 
@@ -186,8 +187,6 @@ func checkProposalOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (tim
 	now := tmtime.Now()
 	lastProposal.Timestamp = now
 	newProposal.Timestamp = now
-	lastProposalBytes, _ := cdc.MarshalBinaryLengthPrefixed(lastProposal)
-	newProposalBytes, _ := cdc.MarshalBinaryLengthPrefixed(newProposal)
 
-	return lastTime, bytes.Equal(newProposalBytes, lastProposalBytes)
+	return lastTime, proto.Equal(&newProposal, &lastProposal)
 }

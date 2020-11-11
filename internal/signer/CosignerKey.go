@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
-	"github.com/tendermint/tendermint/crypto"
-	tmed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmCrypto "github.com/tendermint/tendermint/crypto"
+	tmCryptoEncoding "github.com/tendermint/tendermint/crypto/encoding"
+	tmProtoCrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
 )
 
 // CosignerKey is a single key for an m-of-n threshold signer.
 type CosignerKey struct {
-	PubKey       crypto.PubKey    `json:"pub_key"`
+	PubKey       tmCrypto.PubKey  `json:"pub_key"`
 	ShareKey     []byte           `json:"secret_share"`
 	RSAKey       rsa.PrivateKey   `json:"rsa_key"`
 	ID           int              `json:"id"`
@@ -30,7 +31,12 @@ func (cosignerKey *CosignerKey) MarshalJSON() ([]byte, error) {
 		rsaPubKeysBytes = append(rsaPubKeysBytes, publicBytes)
 	}
 
-	pubkey, err := cdc.MarshalBinaryBare(cosignerKey.PubKey)
+	protoPubkey, err := tmCryptoEncoding.PubKeyToProto(cosignerKey.PubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	protoBytes, err := protoPubkey.Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +47,7 @@ func (cosignerKey *CosignerKey) MarshalJSON() ([]byte, error) {
 		CosignerKeys [][]byte `json:"rsa_pubs"`
 		*Alias
 	}{
-		Pubkey:       pubkey,
+		Pubkey:       protoBytes,
 		RSAKey:       privateBytes,
 		CosignerKeys: rsaPubKeysBytes,
 		Alias:        (*Alias)(cosignerKey),
@@ -67,8 +73,13 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	var pubkey tmed25519.PubKeyEd25519
-	err = cdc.UnmarshalBinaryBare(aux.Pubkey, &pubkey)
+	var protoPubkey tmProtoCrypto.PublicKey
+	err = protoPubkey.Unmarshal(aux.Pubkey)
+	if err != nil {
+		return err
+	}
+
+	pubkey, err := tmCryptoEncoding.PubKeyFromProto(protoPubkey)
 	if err != nil {
 		return err
 	}

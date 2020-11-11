@@ -8,18 +8,11 @@ import (
 	"sync"
 	"time"
 
-	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto"
-	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
-	"github.com/tendermint/tendermint/types"
+	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
-
-var cdc = amino.NewCodec()
-
-func init() {
-	cryptoAmino.RegisterAmino(cdc)
-}
 
 type ThresholdValidator struct {
 	threshold int
@@ -64,17 +57,13 @@ func (pv *ThresholdValidator) GetPubKey() (crypto.PubKey, error) {
 
 // SignVote signs a canonical representation of the vote, along with the
 // chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignVote(chainID string, vote *types.Vote) error {
-
-	// round the timestamp to nearest second to reduce non-deterministic signature log messages
-	vote.Timestamp = vote.Timestamp.Round(time.Second)
-
+func (pv *ThresholdValidator) SignVote(chainID string, vote *tmProto.Vote) error {
 	block := &block{
 		Height:    vote.Height,
 		Round:     int64(vote.Round),
 		Step:      VoteToStep(vote),
 		Timestamp: vote.Timestamp,
-		SignBytes: vote.SignBytes(chainID),
+		SignBytes: tm.VoteSignBytes(chainID, vote),
 	}
 	sig, stamp, err := pv.signBlock(chainID, block)
 
@@ -86,17 +75,13 @@ func (pv *ThresholdValidator) SignVote(chainID string, vote *types.Vote) error {
 
 // SignProposal signs a canonical representation of the proposal, along with
 // the chainID. Implements PrivValidator.
-func (pv *ThresholdValidator) SignProposal(chainID string, proposal *types.Proposal) error {
-
-	// round the timestamp to nearest second to reduce non-deterministic signature log messages
-	proposal.Timestamp = proposal.Timestamp.Round(time.Second)
-
+func (pv *ThresholdValidator) SignProposal(chainID string, proposal *tmProto.Proposal) error {
 	block := &block{
 		Height:    proposal.Height,
 		Round:     int64(proposal.Round),
 		Step:      ProposalToStep(proposal),
 		Timestamp: proposal.Timestamp,
-		SignBytes: proposal.SignBytes(chainID),
+		SignBytes: tm.ProposalSignBytes(chainID, proposal),
 	}
 	sig, stamp, err := pv.signBlock(chainID, block)
 
@@ -343,7 +328,7 @@ func (pv *ThresholdValidator) signBlock(chainID string, block *block) ([]byte, t
 	signature := append(ephemeralPublic, combinedSig...)
 
 	// verify the combined signature before saving to watermark
-	if !pv.pubkey.VerifyBytes(signBytes, signature) {
+	if !pv.pubkey.VerifySignature(signBytes, signature) {
 		return nil, stamp, errors.New("Combined signature is not valid")
 	}
 

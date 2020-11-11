@@ -9,13 +9,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	tm_ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	"github.com/tendermint/tendermint/types"
+	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmProto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tm "github.com/tendermint/tendermint/types"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
 
 func TestLocalCosignerGetID(test *testing.T) {
-	dummyPub := tm_ed25519.PubKeyEd25519{}
+	dummyPub := tmCryptoEd25519.PubKey{}
 
 	bitSize := 4096
 	rsaKey, err := rsa.GenerateKey(rand.Reader, bitSize)
@@ -67,7 +68,7 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 		PublicKey: rsaKey2.PublicKey,
 	}}
 
-	privateKey := tm_ed25519.GenPrivKey()
+	privateKey := tmCryptoEd25519.GenPrivKey()
 
 	privKeyBytes := [64]byte{}
 	copy(privKeyBytes[:], privateKey[:])
@@ -180,14 +181,12 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 	fmt.Printf("eph pub: %x\n", ephemeralPublic)
 
 	// pack a vote into sign bytes
-	var vote types.CanonicalVote
-	vote.ChainID = "foobar"
+	var vote tmProto.Vote
 	vote.Height = 1
 	vote.Round = 0
-	vote.Type = types.PrevoteType
+	vote.Type = tmProto.PrevoteType
 
-	signBytes, err := cdc.MarshalBinaryLengthPrefixed(vote)
-	require.NoError(test, err)
+	signBytes := tm.VoteSignBytes("chain-id", &vote)
 
 	// sign with cosigner 1
 	sigRes1, err := cosigner1.Sign(CosignerSignRequest{
@@ -209,7 +208,7 @@ func TestLocalCosignerSign2of2(test *testing.T) {
 	signature := append(ephemeralPublic, combinedSig...)
 
 	fmt.Printf("signature: %x\n", signature)
-	require.True(test, privateKey.PubKey().VerifyBytes(signBytes, signature))
+	require.True(test, privateKey.PubKey().VerifySignature(signBytes, signature))
 }
 
 func TestLocalCosignerWatermark(test *testing.T) {

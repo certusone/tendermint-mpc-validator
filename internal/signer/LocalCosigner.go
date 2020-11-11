@@ -10,7 +10,8 @@ import (
 	"fmt"
 	"sync"
 
-	tm_ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmCryptoEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmJson "github.com/tendermint/tendermint/libs/json"
 	"gitlab.com/polychainlabs/edwards25519"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
@@ -117,7 +118,7 @@ func NewLocalCosigner(cfg LocalCosignerConfig) *LocalCosigner {
 
 	// cache the public key bytes for signing operations
 	switch ed25519Key := cosigner.key.PubKey.(type) {
-	case tm_ed25519.PubKeyEd25519:
+	case tmCryptoEd25519.PubKey:
 		cosigner.pubKeyBytes = make([]byte, len(ed25519Key))
 		copy(cosigner.pubKeyBytes[:], ed25519Key[:])
 		break
@@ -290,7 +291,8 @@ func (cosigner *LocalCosigner) GetEphemeralSecretPart(req CosignerGetEphemeralSe
 	// sign the response payload with our private key
 	// cosigners can verify the signature to confirm sender validity
 	{
-		jsonBytes, err := cdc.MarshalJSON(res)
+		jsonBytes, err := tmJson.Marshal(res)
+
 		if err != nil {
 			return res, err
 		}
@@ -348,7 +350,7 @@ func (cosigner *LocalCosigner) SetEphemeralSecretPart(req CosignerSetEphemeralSe
 		digestMsg.SourceEphemeralSecretPublicKey = req.SourceEphemeralSecretPublicKey
 		digestMsg.EncryptedSharePart = req.EncryptedSharePart
 
-		digestBytes, err := cdc.MarshalJSON(digestMsg)
+		digestBytes, err := tmJson.Marshal(digestMsg)
 		if err != nil {
 			return err
 		}

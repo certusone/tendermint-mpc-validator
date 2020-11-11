@@ -11,18 +11,14 @@ import (
 
 	"tendermint-signer/internal/signer"
 
-	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto/ed25519"
-	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmOS "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/privval"
 	tsed25519 "gitlab.com/polychainlabs/threshold-ed25519/pkg"
 )
 
 func main() {
-	var cdc = amino.NewCodec()
-	cryptoAmino.RegisterAmino(cdc)
-
 	var threshold = flag.Int("threshold", 2, "the number of shares required to produce a valid signature")
 	var total = flag.Int("total", 2, "the total number of shareholders")
 	flag.Parse()
@@ -37,7 +33,7 @@ func main() {
 		tmOS.Exit(err.Error())
 	}
 	pvKey := privval.FilePVKey{}
-	err = cdc.UnmarshalJSON(keyJSONBytes, &pvKey)
+	err = tmjson.Unmarshal(keyJSONBytes, &pvKey)
 	if err != nil {
 		tmOS.Exit(fmt.Sprintf("Error reading PrivValidator key from %v: %v\n", keyFilePath, err))
 	}
@@ -47,7 +43,7 @@ func main() {
 	// extract the raw private key bytes from the loaded key
 	// we need this to compute the expanded secret
 	switch ed25519Key := pvKey.PrivKey.(type) {
-	case ed25519.PrivKeyEd25519:
+	case ed25519.PrivKey:
 		if len(ed25519Key) != len(privKeyBytes) {
 			panic("Key length inconsistency")
 		}
