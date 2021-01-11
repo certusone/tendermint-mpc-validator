@@ -13,7 +13,7 @@ import (
 func ReadMsg(reader io.Reader) (msg tmProtoPrivval.Message, err error) {
 	const maxRemoteSignerMsgSize = 1024 * 10
 	protoReader := protoio.NewDelimitedReader(reader, maxRemoteSignerMsgSize)
-	err = protoReader.ReadMsg(&msg)
+	_, err = protoReader.ReadMsg(&msg)
 	return msg, err
 }
 
