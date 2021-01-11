@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+	amino "github.com/tendermint/go-amino"
 	tmCrypto "github.com/tendermint/tendermint/crypto"
+	tmEd25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmCryptoEncoding "github.com/tendermint/tendermint/crypto/encoding"
 	tmProtoCrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
 )
@@ -59,7 +61,7 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 
 	aux := &struct {
 		RSAKey       []byte   `json:"rsa_key"`
-		Pubkey       []byte   `json:"pub_key"`
+		PubkeyBytes  []byte   `json:"pub_key"`
 		CosignerKeys [][]byte `json:"rsa_pubs"`
 		*Alias
 	}{
@@ -73,15 +75,31 @@ func (cosignerKey *CosignerKey) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	var pubkey tmCrypto.PubKey
 	var protoPubkey tmProtoCrypto.PublicKey
-	err = protoPubkey.Unmarshal(aux.Pubkey)
-	if err != nil {
-		return err
-	}
+	err = protoPubkey.Unmarshal(aux.PubkeyBytes)
 
-	pubkey, err := tmCryptoEncoding.PubKeyFromProto(protoPubkey)
+	// Prior to the tendermint protobuf migration, the public key bytes in key files
+	// were encoded using the go-amino libraries via
+	// cdc.MarshalBinaryBare(cosignerKey.PubKey)
+	//
+	// To support reading the public key bytes from these key files, we fallback to
+	// amino unmarshalling if the protobuf unmarshalling fails
 	if err != nil {
-		return err
+		var pub tmEd25519.PubKey
+		codec := amino.NewCodec()
+		codec.RegisterInterface((*tmCrypto.PubKey)(nil), nil)
+		codec.RegisterConcrete(tmEd25519.PubKey{}, "tendermint/PubKeyEd25519", nil)
+		errInner := codec.UnmarshalBinaryBare(aux.PubkeyBytes, &pub)
+		if errInner != nil {
+			return err
+		}
+		pubkey = pub
+	} else {
+		pubkey, err = tmCryptoEncoding.PubKeyFromProto(protoPubkey)
+		if err != nil {
+			return err
+		}
 	}
 
 	// unmarshal the public key bytes for each cosigner
